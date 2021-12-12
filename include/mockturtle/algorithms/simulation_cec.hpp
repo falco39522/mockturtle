@@ -35,13 +35,10 @@
 #include <kitty/constructors.hpp>
 #include <kitty/dynamic_truth_table.hpp>
 #include <kitty/operations.hpp>
-#include <kitty/kitty.hpp>
 
 #include "../utils/node_map.hpp"
 #include "miter.hpp"
 #include "simulation.hpp"
-#include <iostream>
-#include <cmath>
 using namespace kitty;
 
 namespace mockturtle
@@ -77,53 +74,47 @@ public:
 
   bool run()
   {
-    get_split_var();
+    get_var();
     pattern_t patterns(_ntk);
+    default_simulator<dynamic_truth_table> sim(_ntk.num_pis());
     init_patterns(patterns);
-    init_simulation(patterns);
-    update_simulation(patterns);
+    check_simulation(patterns, sim);
+    update_simulation(patterns, sim);
     return equiv;
   }
 
 private:
-  void init_simulation(auto& patterns)
+  void check_simulation(auto& patterns, auto& sim)
   {
-    default_simulator<dynamic_truth_table> sim(_ntk.num_pis());
     simulate_nodes(_ntk, patterns, sim);
-    check_equiv(patterns);
+    _ntk.foreach_po( [&]( auto const& f ) 
+    {
+      equiv &= is_const0(_ntk.is_complemented(f)?~patterns[f]:patterns[f]);
+    });
   }
 
-  void update_simulation(auto& patterns)
+  void update_simulation(auto& patterns, auto& sim)
   {
     if(_st.rounds > 1)
     {
       for (auto i = 0; i != _st.rounds; i++)
       {
-        auto k = i;
-        default_simulator<dynamic_truth_table> sim(_ntk.num_pis());
+        auto k = i << 1;
         for(auto j = 0; j != _ntk.num_pis() - _st.split_var; j++)
         {
-          patterns[_st.split_var + j] = sim.compute_constant(k%2?true:false);
-          k /= 2;
+          patterns[_st.split_var + j] = sim.compute_constant((k/=2)%2);
         }
-        simulate_nodes(_ntk, patterns, sim);
-        check_equiv(patterns);
+        check_simulation(patterns, sim);
       }
     }
-  }
-
-  void check_equiv(auto& patterns)
-  {
-    _ntk.foreach_po( [&]( auto const& f ) {
-      equiv = _ntk.is_complemented( f )?(is_const0(~patterns[f])?equiv:false):(is_const0(patterns[f])?equiv:false);
-    });
   }
   
   void init_patterns(auto& patterns)
   {
-    _ntk.foreach_pi( [&]( auto const& i ) {
+    _ntk.foreach_pi( [&]( auto const& i ) 
+    {
       dynamic_truth_table tt (_ntk.num_pis());
-      if( i < _ntk.num_pis())
+      if( i < _st.split_var)
       {
         create_nth_var( tt, i );
         patterns[i] = tt;
@@ -131,12 +122,11 @@ private:
     } );
   }
   
-  void get_split_var()
+  void get_var()
   {
-    uint32_t num_pis = _ntk.num_pis();
     uint32_t m = log((1 << 29)/_ntk._storage->nodes.size() - 32)/log(2) + 3;
-    _st.split_var = num_pis < 6 ? num_pis : (num_pis > m ? m : num_pis );
-    _st.rounds = 1 << (num_pis - _st.split_var);
+    _st.split_var = _ntk.num_pis() < 6 ? _ntk.num_pis() : (_ntk.num_pis() > m ? m : _ntk.num_pis() );
+    _st.rounds = 1 << (_ntk.num_pis() - _st.split_var);
     std::cout << "==========Please wait a moment, it takes a while==========" << std::endl;
   }
 
