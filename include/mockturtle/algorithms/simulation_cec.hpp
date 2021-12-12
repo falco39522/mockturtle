@@ -34,15 +34,12 @@
 
 #include <kitty/constructors.hpp>
 #include <kitty/dynamic_truth_table.hpp>
-#include <kitty/static_truth_table.hpp>
 #include <kitty/operations.hpp>
 #include <kitty/kitty.hpp>
-#include <kitty/detail/constants.hpp>
 
 #include "../utils/node_map.hpp"
 #include "miter.hpp"
 #include "simulation.hpp"
-#include <math.h>
 #include <iostream>
 #include <cmath>
 using namespace kitty;
@@ -82,7 +79,6 @@ public:
   {
     get_split_var();
     pattern_t patterns(_ntk);
-
     init_patterns(patterns);
     init_simulation(patterns);
     update_simulation(patterns);
@@ -118,16 +114,14 @@ private:
 
   void check_equiv(auto& patterns)
   {
-    _ntk.foreach_po( [&]( auto const& f ) 
-    {
+    _ntk.foreach_po( [&]( auto const& f ) {
       equiv = _ntk.is_complemented( f )?(is_const0(~patterns[f])?equiv:false):(is_const0(patterns[f])?equiv:false);
     });
   }
   
   void init_patterns(auto& patterns)
   {
-    _ntk.foreach_pi( [&]( auto const& i ) 
-    {
+    _ntk.foreach_pi( [&]( auto const& i ) {
       dynamic_truth_table tt (_ntk.num_pis());
       if( i < _ntk.num_pis())
       {
