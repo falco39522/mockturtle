@@ -34,11 +34,18 @@
 
 #include <kitty/constructors.hpp>
 #include <kitty/dynamic_truth_table.hpp>
+#include <kitty/static_truth_table.hpp>
 #include <kitty/operations.hpp>
+#include <kitty/kitty.hpp>
+#include <kitty/detail/constants.hpp>
 
 #include "../utils/node_map.hpp"
 #include "miter.hpp"
 #include "simulation.hpp"
+#include <math.h>
+#include <iostream>
+#include <cmath>
+using namespace kitty;
 
 namespace mockturtle
 {
@@ -73,14 +80,76 @@ public:
 
   bool run()
   {
-    /* TODO: write your implementation here */
-    return false;
+    get_split_var();
+    pattern_t patterns(_ntk);
+
+    init_patterns(patterns);
+    init_simulation(patterns);
+    update_simulation(patterns);
+    return equiv;
   }
 
 private:
-  /* you can add additional methods here */
+  void init_simulation(auto& patterns)
+  {
+    default_simulator<dynamic_truth_table> sim(_ntk.num_pis());
+    simulate_nodes(_ntk, patterns, sim);
+    check_equiv(patterns);
+  }
+
+  void update_simulation(auto& patterns)
+  {
+    if(_st.rounds > 1)
+    {
+      for (auto i = 0; i != _st.rounds; i++)
+      {
+        uint32_t all_ones_zeros_length = _ntk.num_pis() - _st.split_var;
+        auto k = i;
+        default_simulator<dynamic_truth_table> sim(_ntk.num_pis());
+        for(auto j = 0; j != all_ones_zeros_length; j++)
+        {
+          patterns[_st.split_var + j] = sim.compute_constant(k%2?true:false);
+          k /= 2;
+        }
+        simulate_nodes(_ntk, patterns, sim);
+        check_equiv(patterns);
+      }
+    }
+  }
+
+  void check_equiv(auto& patterns)
+  {
+    _ntk.foreach_po( [&]( auto const& f ) 
+    {
+      equiv = _ntk.is_complemented( f )?(is_const0(~patterns[f])?equiv:false):(is_const0(patterns[f])?equiv:false);
+    });
+  }
+  
+  void init_patterns(auto& patterns)
+  {
+    _ntk.foreach_pi( [&]( auto const& i ) 
+    {
+      dynamic_truth_table tt (_ntk.num_pis());
+      if( i < _ntk.num_pis())
+      {
+        create_nth_var( tt, i );
+        patterns[i] = tt;
+      }
+    } );
+  }
+  
+  void get_split_var()
+  {
+    uint32_t num_pis = _ntk.num_pis();
+    uint32_t num_nodes = _ntk._storage->nodes.size();
+    uint32_t m = log(pow(2, 29)/num_nodes - 32)/log(2) + 3;
+    _st.split_var = num_pis < 6 ? num_pis : (num_pis > m ? m : num_pis );
+    _st.rounds = pow(2, num_pis - _st.split_var);
+    std::cout << "==========Please wait a moment, it takes a while==========" << std::endl;
+  }
 
 private:
+  bool equiv = true;
   Ntk& _ntk;
   simulation_cec_stats& _st;
   /* you can add other attributes here */
