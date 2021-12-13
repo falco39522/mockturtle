@@ -56,8 +56,7 @@ struct simulation_cec_stats
 
 namespace detail
 {
-
-
+  
 template<class Ntk>
 class simulation_cec_impl
 {
