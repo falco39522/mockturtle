@@ -79,20 +79,14 @@ public:
     _st.rounds = 1 << (_ntk.num_pis() - _st.split_var);
     pattern_t patterns(_ntk);
     default_simulator<dynamic_truth_table> sim(_st.split_var);
-    for(auto round = 0; round != _st.rounds; round++)
-    {
-      _ntk.foreach_pi( [&]( auto const& i ) 
-      {
+    for(auto round = 0; round != _st.rounds; round++){
+      _ntk.foreach_pi( [&]( auto const& i ){
         dynamic_truth_table tt (_st.split_var);
-        if(i <= _st.split_var) 
-        {
-          create_nth_var(tt, i-1);
-        }
+        if(i <= _st.split_var) create_nth_var(tt, i-1);
         patterns[i] = (i <= _st.split_var)?tt:(round>>(i-_st.split_var-1))%2?tt:~tt;
       } );
       simulate_nodes(_ntk, patterns, sim);
-      _ntk.foreach_po( [&]( auto const& f ) 
-      {
+      _ntk.foreach_po( [&]( auto const& f ){
         equiv &= is_const0(_ntk.is_complemented(f)?~patterns[f]:patterns[f]);
       });
     }
