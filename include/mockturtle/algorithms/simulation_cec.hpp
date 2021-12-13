@@ -83,7 +83,7 @@ public:
       _ntk.foreach_pi( [&]( auto const& i ){
         dynamic_truth_table tt (_st.split_var);
         if(i <= _st.split_var) create_nth_var(tt, i-1);
-        patterns[i] = (i <= _st.split_var)?tt:(round>>(i-_st.split_var-1))%2?tt:~tt;
+        patterns[i] = i <= _st.split_var?tt:(round>>(i-_st.split_var-1))%2?tt:~tt;
       } );
       simulate_nodes(_ntk, patterns, sim);
       _ntk.foreach_po( [&]( auto const& f ){
