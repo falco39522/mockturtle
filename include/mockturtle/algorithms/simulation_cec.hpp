@@ -57,6 +57,7 @@ struct simulation_cec_stats
 namespace detail
 {
 
+
 template<class Ntk>
 class simulation_cec_impl
 {
@@ -74,67 +75,40 @@ public:
 
   bool run()
   {
-    get_var();
-    pattern_t patterns(_ntk);
-    default_simulator<dynamic_truth_table> sim(_ntk.num_pis());
-    init_patterns(patterns);
-    check_simulation(patterns, sim);
-    update_simulation(patterns, sim);
-    return equiv;
-  }
-
-private:
-  void check_simulation(auto& patterns, auto& sim)
-  {
-    simulate_nodes(_ntk, patterns, sim);
-    _ntk.foreach_po( [&]( auto const& f ) 
-    {
-      equiv &= is_const0(_ntk.is_complemented(f)?~patterns[f]:patterns[f]);
-    });
-  }
-
-  void update_simulation(auto& patterns, auto& sim)
-  {
-    if(_st.rounds > 1)
-    {
-      for (auto i = 0; i != _st.rounds; i++)
-      {
-        auto k = i << 1;
-        for(auto j = 0; j != _ntk.num_pis() - _st.split_var; j++)
-        {
-          patterns[_st.split_var + j] = sim.compute_constant((k/=2)%2);
-        }
-        check_simulation(patterns, sim);
-      }
-    }
-  }
-  
-  void init_patterns(auto& patterns)
-  {
-    _ntk.foreach_pi( [&]( auto const& i ) 
-    {
-      dynamic_truth_table tt (_ntk.num_pis());
-      if( i < _st.split_var)
-      {
-        create_nth_var( tt, i );
-        patterns[i] = tt;
-      }
-    } );
-  }
-  
-  void get_var()
-  {
     uint32_t m = log((1 << 29)/_ntk._storage->nodes.size() - 32)/log(2) + 3;
     _st.split_var = _ntk.num_pis() < 6 ? _ntk.num_pis() : (_ntk.num_pis() > m ? m : _ntk.num_pis() );
     _st.rounds = 1 << (_ntk.num_pis() - _st.split_var);
-    std::cout << "==========Please wait a moment, it takes a while==========" << std::endl;
+    //==============================================================================================//
+    pattern_t patterns(_ntk);
+    default_simulator<dynamic_truth_table> sim(_st.split_var);
+    //==============================================================================================//
+    for(auto round = 0; round != _st.rounds; round++)
+    {
+      _ntk.foreach_pi( [&]( auto const& i ) 
+      {
+        dynamic_truth_table tt (_st.split_var);
+        if(i <= _st.split_var) 
+        {
+          create_nth_var(tt, i-1);
+        }
+        patterns[i] = (i <= _st.split_var)?tt:(round>>(i-_st.split_var-1))%2?tt:~tt;
+      } );
+      //============================================================================================//
+      simulate_nodes(_ntk, patterns, sim);
+      //============================================================================================//
+      _ntk.foreach_po( [&]( auto const& f ) 
+      {
+        equiv &= is_const0(_ntk.is_complemented(f)?~patterns[f]:patterns[f]);
+      });
+    }
+    //==============================================================================================//
+    return equiv;
   }
 
 private:
   bool equiv = true;
   Ntk& _ntk;
   simulation_cec_stats& _st;
-  /* you can add other attributes here */
 };
 
 } // namespace detail
